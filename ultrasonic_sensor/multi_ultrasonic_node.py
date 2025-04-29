@@ -24,11 +24,11 @@ class MultiUltrasonicNode(Node):
         }
 
         self.sensors = {}
-        self.publishers = {}
+        self.sensor_publishers = {}
 
         for name, (trig, echo) in self.sensor_configs.items():
             self.sensors[name] = UltrasonicSensor(self.chip, trig, echo)
-            self.publishers[name] = self.create_publisher(Range, f'/ultrasonic/{name}', 10)
+            self.sensor_publishers[name] = self.create_publisher(Range, f'/ultrasonic/{name}', 10)
 
         self.timer = self.create_timer(0.1, self.publish_all)
 
@@ -45,7 +45,7 @@ class MultiUltrasonicNode(Node):
 
             distance = sensor.get_distance()
             msg.range = min(max(distance, msg.min_range), msg.max_range) if distance != float('inf') else float('inf')
-            self.publishers[name].publish(msg)
+            self.sensor_publishers[name].publish(msg)
             self.get_logger().info(f"[{name}] Range: {msg.range:.2f} cm")
 
     def destroy_node(self):
