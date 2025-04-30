@@ -10,7 +10,7 @@ class UltrasonicSensorNode(Node):
         self.get_logger().info(f"Sensor {sensor_id} Node Initialized")
 
         # Initialize the base ultrasonic sensor
-        self.sensor = UltrasonicSensorBase(trig_pin, echo_pin, sensor_id)
+        self.sensor = UltrasonicSensor(trig_pin, echo_pin, sensor_id)
 
         # Publisher for ultrasonic sensor distance
         self.publisher = self.create_publisher(Range, f'ultrasonic_distance_{sensor_id}', 10)
@@ -39,7 +39,12 @@ class UltrasonicSensorNode(Node):
             time.sleep(1/30)  # Control the frequency of publishing
 
     def destroy_node(self):
-        self.sensor.stop()
+        if rclpy.ok():
+            self.get_logger().info("Shutting down sensors...")
+        else:
+            print("[STDOUT] Shutting down sensors...")
+        for sensor in self.sensors:
+            sensor.stop()
         super().destroy_node()
 
 def main(args=None):
@@ -57,7 +62,8 @@ def main(args=None):
     finally:
         sensor_1.destroy_node()
         sensor_2.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
