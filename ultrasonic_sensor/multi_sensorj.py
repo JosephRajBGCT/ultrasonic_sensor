@@ -36,7 +36,7 @@ class UltrasonicSensorNode(Node):
 
             self.publisher.publish(msg)
             self.get_logger().info(f"Sensor {self.sensor.sensor_id} Distance: {msg.range:.2f} cm")
-            time.sleep(0.2)  # Control the frequency of publishing
+            time.sleep(1/30)  # Control the frequency of publishing
 
     def destroy_node(self):
         self.sensor.stop()
