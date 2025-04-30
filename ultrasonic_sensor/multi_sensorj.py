@@ -22,7 +22,7 @@ class UltrasonicSensorNode(Node):
     def measure_and_publish(self):
         while rclpy.ok():
             # Get the filtered distance from the sensor base class
-            distance = self.sensor.get_filtered_distance()
+            distance = self.sensor.get_validated_distance()
             
             # Create and publish the message
             msg = Range()
