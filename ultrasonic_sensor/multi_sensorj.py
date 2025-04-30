@@ -2,7 +2,7 @@ import rclpy
 from rclpy.node import Node
 import threading
 from sensor_msgs.msg import Range
-from .ultrasonic_sensor_base import UltrasonicSensorBase  # Import the base class
+from .ultrasonicsensorj import UltrasonicSensor  # Import the base class
 
 class UltrasonicSensorNode(Node):
     def __init__(self, trig_pin, echo_pin, sensor_id):
