@@ -1,13 +1,13 @@
 import time
+import threading
 import lgpio
-import os
 import math
 
-class UltrasonicSensor:
-    def __init__(self, trig_pin, echo_pin, sensor_id=None):
+class UltrasonicSensorBase:
+    def __init__(self, trig_pin, echo_pin, sensor_id='default'):
         self.trig_pin = trig_pin
         self.echo_pin = echo_pin
-        self.sensor_id = sensor_id or 'default'
+        self.sensor_id = sensor_id
         self.running = True
 
         self.chip = lgpio.gpiochip_open(0)
@@ -17,7 +17,9 @@ class UltrasonicSensor:
         self.filtered_distance = 0.0
         self.alpha = 0.3
 
-        print(f"[STDOUT] Sensor {self.sensor_id} - Process PID: {os.getpid()}")
+        self.lock = threading.Lock()
+        self.thread = threading.Thread(target=self.run_sensor, daemon=True)
+        self.thread.start()
 
     def measure_distance(self):
         lgpio.gpio_write(self.chip, self.trig_pin, 0)
@@ -45,13 +47,30 @@ class UltrasonicSensor:
     def low_pass_filter(self, new_value):
         return self.alpha * new_value + (1 - self.alpha) * self.filtered_distance
 
+    def run_sensor(self):
+        while self.running:
+            raw_distance = self.measure_distance()
+            if raw_distance != -1:
+                with self.lock:
+                    self.filtered_distance = self.low_pass_filter(raw_distance)
+            time.sleep(0.02)
+
     def get_filtered_distance(self):
-        raw_distance = self.measure_distance()
-        self.filtered_distance = self.low_pass_filter(raw_distance)
-        return self.filtered_distance
+        with self.lock:
+            return self.filtered_distance
+
+    def get_validated_distance(self):
+        distance = self.get_filtered_distance()
+        if distance < 3.0 or distance > 100.0 or distance == -1:
+            return float('inf')
+        return float(distance)
 
     def stop(self):
         self.running = False
+        if self.thread.is_alive():
+            self.thread.join()
         if hasattr(self, 'chip'):
             lgpio.gpiochip_close(self.chip)
-        print(f"[STDOUT] Sensor {self.sensor_id} stopped.")
+
+    def __del__(self):
+        self.stop()
