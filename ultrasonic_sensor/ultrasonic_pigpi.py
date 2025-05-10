@@ -33,7 +33,7 @@ class DistanceSensor(Node):
         self.get_logger().info(f"Sensor {self.sensor_id} initialized and ready to measure distance.")
 
         # Initialize the filtered distance variable (starting with an initial value)
-        self.filtered_distance = float('inf')
+        
 
         # Set a timer for periodic measurement
         self.timer = self.create_timer(1.0 / 15, self.measure_distance)  # Publishing frequency: 15Hz
@@ -73,10 +73,8 @@ class DistanceSensor(Node):
         distance_cm = (duration * 34300) / 2  # Speed of sound = 34300 cm/s
 
         # Ensure distance is within valid range (3cm to 100cm)
-        if distance_cm < 3 or distance_cm > 100:
-            distance_cm = float('inf')  # If outside range, set to infinity
+       
 
-        # Apply low-pass filter (if alpha < 1, smoothing will occur; alpha = 1 means no smoothing)
         self.filtered_distance = self.alpha * distance_cm + (1 - self.alpha) * self.filtered_distance
 
         # Prepare the Range message
@@ -88,6 +86,11 @@ class DistanceSensor(Node):
         msg.min_range = 3.0  # Minimum valid range in cm
         msg.max_range = 100.0  # Maximum valid range in cm
         msg.field_of_view = 0.52  # Field of view in radians
+        if self.filtered_distance < msg.min_range or self.filtered_distance > msg.max_range or self.filtered_distance == -1:
+            msg.range = float('inf')
+        else:
+            msg.range = round(float(self.filtered_distance),2)
+
 
         # Publish the Range message
         self.distance_publisher.publish(msg)
@@ -95,11 +98,7 @@ class DistanceSensor(Node):
         # Log the published data
         self.get_logger().info(f"Sensor {self.sensor_id}: Filtered Distance: {msg.range} cm")
 
-    def stop(self):
-        """ Stop the sensor and clean up resources. """
-        self.pi.stop()
-        self.get_logger().info(f"Sensor {self.sensor_id} stopped.")
-
+    
 def main(args=None):
     rclpy.init(args=args)
 
