@@ -1,0 +1,59 @@
+import lgpio
+import time
+
+# GPIO pin numbers (BCM)
+TRIG_PIN = 9
+ECHO_PIN = 10
+
+# Open GPIO chip
+h = lgpio.gpiochip_open(0)
+
+# Set up pins
+lgpio.gpio_claim_output(h, TRIG_PIN)
+lgpio.gpio_claim_input(h, ECHO_PIN)
+
+def measure_distance():
+    # Ensure trigger is low
+    lgpio.gpio_write(h, TRIG_PIN, 0)
+    lgpio.usleep(2)  # 2 microseconds
+
+    # Send 10µs trigger pulse
+    lgpio.gpio_write(h, TRIG_PIN, 1)
+    lgpio.usleep(10)
+    lgpio.gpio_write(h, TRIG_PIN, 0)
+
+    # Wait for echo to go high
+    start_tick = lgpio.tick(h)
+    timeout = start_tick + 30000  # 30ms timeout
+    while lgpio.gpio_read(h, ECHO_PIN) == 0:
+        if lgpio.tick(h) - start_tick > 30000:
+            return None  # Timeout
+
+    start = lgpio.tick(h)
+
+    # Wait for echo to go low
+    while lgpio.gpio_read(h, ECHO_PIN) == 1:
+        if lgpio.tick(h) - start > 30000:
+            return None  # Timeout
+
+    end = lgpio.tick(h)
+
+    # Pulse duration in microseconds
+    pulse_duration = end - start
+
+    # Distance in cm: (duration in µs * speed of sound) / 2
+    distance = (pulse_duration * 0.0343) / 2
+    return round(distance, 2)
+
+try:
+    while True:
+        dist = measure_distance()
+        if dist is None:
+            print("Out of range or no echo")
+        else:
+            print(f"Distance: {dist} cm")
+        time.sleep(0.3)  # Delay between readings
+
+except KeyboardInterrupt:
+    print("Exiting...")
+    lgpio.gpiochip_close(h)
