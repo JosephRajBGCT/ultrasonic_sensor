@@ -1,59 +1,59 @@
-import lgpio
+import pigpio
 import time
 
-# GPIO pin numbers (BCM)
-TRIG_PIN = 9
-ECHO_PIN = 10
+TRIG = 9    # GPIO pin connected to TRIG
+ECHO = 10   # GPIO pin connected to ECHO
 
-# Open GPIO chip
-h = lgpio.gpiochip_open(0)
+pi = pigpio.pi()
 
-# Set up pins
-lgpio.gpio_claim_output(h, TRIG_PIN)
-lgpio.gpio_claim_input(h, ECHO_PIN)
+if not pi.connected:
+    print("Failed to connect to pigpio daemon!")
+    exit()
 
-def measure_distance():
-    # Ensure trigger is low
-    lgpio.gpio_write(h, TRIG_PIN, 0)
-    lgpio.usleep(2)  # 2 microseconds
+# Set up GPIO modes
+pi.set_mode(TRIG, pigpio.OUTPUT)
+pi.set_mode(ECHO, pigpio.INPUT)
 
-    # Send 10µs trigger pulse
-    lgpio.gpio_write(h, TRIG_PIN, 1)
-    lgpio.usleep(10)
-    lgpio.gpio_write(h, TRIG_PIN, 0)
+def get_distance():
+    # Ensure TRIG is low
+    pi.write(TRIG, 0)
+    time.sleep(2e-6)  # 2 microseconds
+
+    # Send 10µs pulse
+    pi.write(TRIG, 1)
+    time.sleep(10e-6)  # 10 microseconds
+    pi.write(TRIG, 0)
 
     # Wait for echo to go high
-    start_tick = lgpio.tick(h)
-    timeout = start_tick + 30000  # 30ms timeout
-    while lgpio.gpio_read(h, ECHO_PIN) == 0:
-        if lgpio.tick(h) - start_tick > 30000:
-            return None  # Timeout
-
-    start = lgpio.tick(h)
+    start_time = time.time()
+    while pi.read(ECHO) == 0:
+        if time.time() - start_time > 0.03:  # 30 ms timeout
+            return None
+    start = time.time()
 
     # Wait for echo to go low
-    while lgpio.gpio_read(h, ECHO_PIN) == 1:
-        if lgpio.tick(h) - start > 30000:
-            return None  # Timeout
+    while pi.read(ECHO) == 1:
+        if time.time() - start > 0.03:  # 30 ms timeout
+            return None
+    end = time.time()
 
-    end = lgpio.tick(h)
+    # Calculate duration
+    duration = end - start  # seconds
+    distance_cm = (duration * 34300) / 2  # speed of sound = 34300 cm/s
 
-    # Pulse duration in microseconds
-    pulse_duration = end - start
-
-    # Distance in cm: (duration in µs * speed of sound) / 2
-    distance = (pulse_duration * 0.0343) / 2
-    return round(distance, 2)
+    return round(distance_cm, 2)
 
 try:
     while True:
-        dist = measure_distance()
-        if dist is None:
-            print("Out of range or no echo")
-        else:
+        dist = get_distance()
+        if dist is not None:
             print(f"Distance: {dist} cm")
-        time.sleep(0.3)  # Delay between readings
+        else:
+            print("Timeout or no object detected.")
+        time.sleep(0.3)  # avoid flooding output
 
 except KeyboardInterrupt:
-    print("Exiting...")
-    lgpio.gpiochip_close(h)
+    print("\nMeasurement stopped by user")
+
+finally:
+    pi.stop()
